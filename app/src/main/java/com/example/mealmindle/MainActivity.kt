@@ -19,7 +19,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.example.mealmindle.data.ProductResponse
-import com.google.gson.Gson
+import com.google.gson.GsonBuilder
+import com.google.gson.reflect.TypeToken
+import okhttp3.ResponseBody
+import java.lang.reflect.Type
 
 class MainActivity : ComponentActivity() {
 
@@ -51,7 +54,7 @@ class MainActivity : ComponentActivity() {
             } else {
                 val barcode = result.contents
 
-                lifecycleScope.launch(Dispatchers.IO) {
+                lifecycleScope.launch {
                     try {
                         val response = ApiService.productApi.getProductDetails(barcode)
                         if (response.isSuccessful) {
@@ -60,8 +63,9 @@ class MainActivity : ComponentActivity() {
                             // Debugging-Ausgabe hinzufügen, um den Inhalt der Antwort anzuzeigen
                             Log.d("API_RESPONSE", "Response Body: $responseBody")
 
-                            val gson = Gson()
-                            val productResponse = gson.fromJson(responseBody, ProductResponse::class.java)
+                            val gson = GsonBuilder().setLenient().create()
+                            val productType: Type = object : TypeToken<ProductResponse>() {}.type
+                            val productResponse = gson.fromJson<ProductResponse>(responseBody, productType)
 
                             withContext(Dispatchers.Main) {
                                 if (productResponse != null) {
