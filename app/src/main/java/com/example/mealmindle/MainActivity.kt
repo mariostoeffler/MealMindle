@@ -1,3 +1,5 @@
+package com.example.mealmindle
+
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -11,18 +13,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.lifecycleScope
-import com.example.mealmindle.api.ApiService
+import com.example.mealmindle.data.ProductResponse
 import com.example.mealmindle.ui.theme.MealMindleTheme
 import com.google.zxing.integration.android.IntentIntegrator
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import com.example.mealmindle.data.ProductResponse
-import com.google.gson.GsonBuilder
-import com.google.gson.reflect.TypeToken
-import okhttp3.ResponseBody
-import java.lang.reflect.Type
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
 
 class MainActivity : ComponentActivity() {
 
@@ -54,45 +50,28 @@ class MainActivity : ComponentActivity() {
             } else {
                 val barcode = result.contents
 
-                lifecycleScope.launch {
-                    try {
-                        val response = ApiService.productApi.getProductDetails(barcode)
-                        if (response.isSuccessful) {
-                            val responseBody = response.body()?.string()
-
-                            // Debugging-Ausgabe hinzufügen, um den Inhalt der Antwort anzuzeigen
-                            Log.d("API_RESPONSE", "Response Body: $responseBody")
-
-                            val gson = GsonBuilder().setLenient().create()
-                            val productType: Type = object : TypeToken<ProductResponse>() {}.type
-                            val productResponse = gson.fromJson<ProductResponse>(responseBody, productType)
-
-                            withContext(Dispatchers.Main) {
-                                if (productResponse != null) {
-                                    val productName = productResponse.product.product_name
-                                    val quantity = productResponse.product.quantity
-                                    // ... access other properties as needed ...
-
-                                    val message = "Product Name: $productName\nQuantity: $quantity"
-                                    Toast.makeText(this@MainActivity, message, Toast.LENGTH_LONG).show()
-                                } else {
-                                    Toast.makeText(this@MainActivity, "Error parsing API response", Toast.LENGTH_LONG).show()
-                                }
-                            }
+                val call: Call<ProductResponse> = ApiService.instance.getProductDetails(barcode, "876d1460", "25c045fdf1878cb805b586a364171b21")
+                call.enqueue(object : Callback<ProductResponse> {
+                    override fun onResponse(call: Call<ProductResponse>, response: Response<ProductResponse>) {
+                        if (response.isSuccessful && response.body() != null) {
+                            val productDetails = response.body() // Hier bekommst du die Antwort als ProductResponse-Objekt
+                            // Verarbeite die Antwort hier weiter
                         } else {
-                            withContext(Dispatchers.Main) {
-                                Toast.makeText(this@MainActivity, "An error occurred.", Toast.LENGTH_LONG).show()
+                            runOnUiThread {
+                                Toast.makeText(this@MainActivity, "Product not found.", Toast.LENGTH_LONG).show()
                             }
-                        }
-                    } catch (e: Exception) {
-                        withContext(Dispatchers.Main) {
-                            val errorMessage = "An unexpected error occurred: ${e.localizedMessage}"
-                            Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_LONG).show()
-                            Log.e("API_RESPONSE_ERROR", errorMessage)
-                            e.printStackTrace()
                         }
                     }
-                }
+
+                    override fun onFailure(call: Call<ProductResponse>, t: Throwable) {
+                        runOnUiThread {
+                            val errorMessage = "An unexpected error occurred: ${t.localizedMessage}"
+                            Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_LONG).show()
+                            Log.e("API_RESPONSE_ERROR", errorMessage)
+                            t.printStackTrace()
+                        }
+                    }
+                })
             }
         } else {
             super.onActivityResult(requestCode, resultCode, data)
@@ -100,10 +79,10 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun Greeting(name: String, modifier: Modifier = Modifier) {
+    fun Greeting(name: String) {
         Text(
             text = "Hello $name!",
-            modifier = modifier
+            modifier = Modifier.fillMaxSize()
         )
     }
 }
